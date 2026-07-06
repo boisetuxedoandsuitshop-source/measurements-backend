@@ -10,6 +10,7 @@ export default function Dashboard() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [selectedMeasurement, setSelectedMeasurement] = useState(null);
+  const [editingMeasurement, setEditingMeasurement] = useState(null);
   const [sortBy, setSortBy] = useState('submitted_at');
   const [sortOrder, setSortOrder] = useState('DESC');
 
@@ -115,6 +116,11 @@ export default function Dashboard() {
       month: 'short',
       day: 'numeric',
     });
+  };
+
+  const handleSaveEdit = (updated) => {
+    setMeasurements(prev => prev.map(m => m.id === updated.id ? updated : m));
+    setEditingMeasurement(null);
   };
 
   const handlePrintMeasurement = (m) => {
@@ -270,6 +276,12 @@ export default function Dashboard() {
                         View
                       </button>
                       <button
+                        onClick={() => setEditingMeasurement(m)}
+                        style={styles.editButton}
+                      >
+                        Edit
+                      </button>
+                      <button
                         onClick={() => handleDelete(m.id)}
                         style={styles.deleteButton}
                       >
@@ -309,6 +321,15 @@ export default function Dashboard() {
           measurement={selectedMeasurement}
           onClose={() => setSelectedMeasurement(null)}
           onPrint={() => handlePrintMeasurement(selectedMeasurement)}
+        />
+      )}
+
+      {editingMeasurement && (
+        <EditModal
+          measurement={editingMeasurement}
+          password={password}
+          onClose={() => setEditingMeasurement(null)}
+          onSave={handleSaveEdit}
         />
       )}
     </div>
@@ -399,6 +420,106 @@ function MeasurementModal({ measurement, onClose, onPrint }) {
             Close
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function EditModal({ measurement, password, onClose, onSave }) {
+  const [form, setForm] = useState({ ...measurement });
+  const [saving, setSaving] = useState(false);
+
+  const set = (field, val) => setForm(prev => ({ ...prev, [field]: val }));
+
+  const toDateInput = (val) => {
+    if (!val) return '';
+    return String(val).slice(0, 10);
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const res = await fetch('/api/update-measurement', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...form, password }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        onSave(data.measurement);
+      } else {
+        alert('Failed to save changes');
+      }
+    } catch {
+      alert('Error saving changes');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const inp = { padding: '8px 10px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '13px', fontFamily: 'inherit', width: '100%', boxSizing: 'border-box' };
+  const fieldWrap = { display: 'flex', flexDirection: 'column', gap: '4px' };
+  const lbl = { fontSize: '11px', fontWeight: '600', color: '#555', textTransform: 'uppercase', letterSpacing: '0.05em' };
+  const grid2 = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' };
+
+  return (
+    <div style={styles.modal} onClick={onClose}>
+      <div style={{ ...styles.modalContent, maxWidth: '700px', width: '95%' }} onClick={e => e.stopPropagation()}>
+        <button onClick={onClose} style={styles.closeButton}>✕</button>
+        <h2 style={{ ...styles.modalTitle, marginBottom: '20px' }}>Edit: {measurement.customer_name}</h2>
+        <form onSubmit={handleSubmit}>
+
+          <div style={{ ...styles.modalSection }}>
+            <h3 style={{ marginBottom: '12px' }}>Contact Information</h3>
+            <div style={grid2}>
+              <div style={fieldWrap}><span style={lbl}>Name *</span><input style={inp} value={form.customer_name || ''} onChange={e => set('customer_name', e.target.value)} required /></div>
+              <div style={fieldWrap}><span style={lbl}>Email</span><input style={inp} type="email" value={form.customer_email || ''} onChange={e => set('customer_email', e.target.value)} /></div>
+              <div style={fieldWrap}><span style={lbl}>Phone</span><input style={inp} value={form.customer_phone || ''} onChange={e => set('customer_phone', e.target.value)} /></div>
+              <div style={fieldWrap}><span style={lbl}>Wedding / Event Name</span><input style={inp} value={form.wedding_name || ''} onChange={e => set('wedding_name', e.target.value)} /></div>
+              <div style={fieldWrap}><span style={lbl}>Event Date</span><input style={inp} type="date" value={toDateInput(form.event_date)} onChange={e => set('event_date', e.target.value)} /></div>
+              <div style={fieldWrap}><span style={lbl}>Order Type</span>
+                <select style={inp} value={form.order_type || ''} onChange={e => set('order_type', e.target.value)}>
+                  <option value="">Select...</option>
+                  <option value="rental">Rental</option>
+                  <option value="purchase">Purchase</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div style={styles.modalSection}>
+            <h3 style={{ marginBottom: '12px' }}>Measurements (inches)</h3>
+            <div style={grid2}>
+              {[['chest','Chest'],['overarm','Overarm'],['mid_section','Mid Section'],['waist','Waist'],['outseam','Outseam'],['neck','Neck'],['shirt_sleeve','Shirt Sleeve'],['jacket_sleeve','Jacket Sleeve'],['height','Height'],['weight','Weight (lbs)'],['shoe_size','Shoe Size'],['shoe_width','Shoe Width'],['preferred_fit','Preferred Fit']].map(([field, label]) => (
+                <div key={field} style={fieldWrap}>
+                  <span style={lbl}>{label}</span>
+                  <input style={inp} value={form[field] || ''} onChange={e => set(field, e.target.value)} />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div style={styles.modalSection}>
+            <h3 style={{ marginBottom: '12px' }}>Rental Dates</h3>
+            <div style={grid2}>
+              <div style={fieldWrap}><span style={lbl}>Pickup Date</span><input style={inp} type="date" value={toDateInput(form.pickup_date)} onChange={e => set('pickup_date', e.target.value)} /></div>
+              <div style={fieldWrap}><span style={lbl}>Return Date</span><input style={inp} type="date" value={toDateInput(form.return_date)} onChange={e => set('return_date', e.target.value)} /></div>
+            </div>
+          </div>
+
+          <div style={{ marginBottom: '24px' }}>
+            <h3 style={{ marginBottom: '12px' }}>Special Requests / Notes</h3>
+            <textarea style={{ ...inp, minHeight: '80px', resize: 'vertical' }} value={form.special_requests || ''} onChange={e => set('special_requests', e.target.value)} />
+          </div>
+
+          <div style={styles.modalActions}>
+            <button type="button" onClick={onClose} style={styles.closeModalButton}>Cancel</button>
+            <button type="submit" disabled={saving} style={{ ...styles.printModalButton, background: saving ? '#999' : '#28a745' }}>
+              {saving ? 'Saving…' : 'Save Changes'}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );
@@ -551,6 +672,16 @@ const styles = {
   viewButton: {
     padding: '6px 12px',
     background: '#0066cc',
+    color: '#fff',
+    border: 'none',
+    borderRadius: '3px',
+    cursor: 'pointer',
+    fontSize: '12px',
+    marginRight: '8px',
+  },
+  editButton: {
+    padding: '6px 12px',
+    background: '#28a745',
     color: '#fff',
     border: 'none',
     borderRadius: '3px',
