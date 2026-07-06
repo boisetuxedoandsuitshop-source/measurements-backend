@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 export default function Dashboard() {
   const [authenticated, setAuthenticated] = useState(false);
   const [password, setPassword] = useState('');
+  const [token, setToken] = useState('');
   const [measurements, setMeasurements] = useState([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
@@ -17,17 +18,19 @@ export default function Dashboard() {
   const handleLogin = async (e) => {
     e.preventDefault();
     try {
-      const res = await fetch('/api/get-measurements', {
+      const res = await fetch('/api/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password, page: 1, limit: 20 }),
+        body: JSON.stringify({ password }),
       });
-
+      const data = await res.json();
       if (res.ok) {
+        setToken(data.token);
         setAuthenticated(true);
-        fetchMeasurements(1);
+        setPassword('');
+        fetchMeasurements(1, data.token);
       } else {
-        alert('Incorrect password');
+        alert(data.error || 'Incorrect password');
         setPassword('');
       }
     } catch (error) {
@@ -36,14 +39,29 @@ export default function Dashboard() {
     }
   };
 
-  const fetchMeasurements = async (pageNum = 1) => {
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/logout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token }),
+      });
+    } catch {}
+    setAuthenticated(false);
+    setToken('');
+    setPassword('');
+    setMeasurements([]);
+  };
+
+  const fetchMeasurements = async (pageNum = 1, overrideToken = null) => {
     setLoading(true);
+    const authToken = overrideToken || token;
     try {
       const res = await fetch('/api/get-measurements', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          password,
+          token: authToken,
           page: pageNum,
           limit: 20,
           search,
@@ -60,6 +78,7 @@ export default function Dashboard() {
         setPage(pageNum);
       } else if (res.status === 401) {
         setAuthenticated(false);
+        setToken('');
       }
     } catch (error) {
       console.error('Fetch error:', error);
@@ -82,7 +101,7 @@ export default function Dashboard() {
       const res = await fetch('/api/delete-measurement', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, password }),
+        body: JSON.stringify({ id, token }),
       });
 
       if (res.ok) {
@@ -90,6 +109,7 @@ export default function Dashboard() {
         alert('Measurement deleted successfully');
       } else if (res.status === 401) {
         setAuthenticated(false);
+        setToken('');
       } else {
         alert('Failed to delete measurement');
       }
@@ -201,8 +221,8 @@ export default function Dashboard() {
       <div style={styles.header}>
         <div style={styles.headerContent}>
           <h1 style={styles.title}>Measurements Dashboard</h1>
-          <button onClick={handlePrint} style={styles.printButton}>
-            🖨️ Print
+          <button onClick={handleLogout} style={styles.logoutButton}>
+            Log Out
           </button>
         </div>
 
@@ -327,7 +347,7 @@ export default function Dashboard() {
       {editingMeasurement && (
         <EditModal
           measurement={editingMeasurement}
-          password={password}
+          token={token}
           onClose={() => setEditingMeasurement(null)}
           onSave={handleSaveEdit}
         />
@@ -425,7 +445,7 @@ function MeasurementModal({ measurement, onClose, onPrint }) {
   );
 }
 
-function EditModal({ measurement, password, onClose, onSave }) {
+function EditModal({ measurement, token, onClose, onSave }) {
   const [form, setForm] = useState({ ...measurement });
   const [saving, setSaving] = useState(false);
 
@@ -443,7 +463,7 @@ function EditModal({ measurement, password, onClose, onSave }) {
       const res = await fetch('/api/update-measurement', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, password }),
+        body: JSON.stringify({ ...form, token }),
       });
       if (res.ok) {
         const data = await res.json();
@@ -604,9 +624,9 @@ const styles = {
     fontSize: '24px',
     color: '#1a1a1a',
   },
-  printButton: {
+  logoutButton: {
     padding: '8px 16px',
-    background: '#1a1a1a',
+    background: '#cc0000',
     color: '#fff',
     border: 'none',
     borderRadius: '4px',

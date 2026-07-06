@@ -1,5 +1,5 @@
 import { query } from '../../lib/db';
-import { verifyPassword } from '../../lib/auth';
+import { verifySession } from '../../lib/auth';
 
 export default async function handler(req, res) {
   if (req.method !== 'DELETE') {
@@ -7,9 +7,9 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { id, password } = req.body;
+    const { id, token } = req.body;
 
-    if (!password || !verifyPassword(password)) {
+    if (!verifySession(token)) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
@@ -26,16 +26,9 @@ export default async function handler(req, res) {
       return res.status(404).json({ error: 'Measurement not found' });
     }
 
-    return res.status(200).json({
-      success: true,
-      message: 'Measurement deleted successfully',
-      id: result.rows[0].id,
-    });
+    return res.status(200).json({ success: true, id: result.rows[0].id });
   } catch (error) {
-    console.error('Delete measurement error:', error);
-    return res.status(500).json({
-      error: 'Failed to delete measurement',
-      details: error.message,
-    });
+    console.error('Delete error:', error);
+    return res.status(500).json({ error: 'Failed to delete measurement' });
   }
 }

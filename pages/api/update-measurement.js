@@ -1,5 +1,5 @@
 import { query } from '../../lib/db';
-import { verifyPassword } from '../../lib/auth';
+import { verifySession } from '../../lib/auth';
 
 export default async function handler(req, res) {
   if (req.method !== 'PUT') {
@@ -7,9 +7,9 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { id, password, viewed, ...fields } = req.body;
+    const { id, token, viewed, ...fields } = req.body;
 
-    if (!password || !verifyPassword(password)) {
+    if (!verifySession(token)) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
