@@ -29,6 +29,7 @@ export default async function handler(req, res) {
       special_requests,
       pickup_date,
       return_date,
+      event_date,
     } = req.body;
 
     // Validate required fields
@@ -42,8 +43,8 @@ export default async function handler(req, res) {
         customer_name, customer_email, customer_phone, wedding_name, order_type,
         chest, overarm, mid_section, waist, outseam, neck, shirt_sleeve, height,
         weight, shoe_size, jacket_sleeve, shoe_width, preferred_fit, special_requests,
-        pickup_date, return_date
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
+        pickup_date, return_date, event_date
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
       RETURNING id`,
       [
         customer_name,
@@ -67,6 +68,7 @@ export default async function handler(req, res) {
         special_requests,
         pickup_date,
         return_date,
+        event_date || null,
       ]
     );
 

@@ -98,10 +98,6 @@ export default function Dashboard() {
     }
   };
 
-  const handlePrint = () => {
-    window.print();
-  };
-
   const formatDate = (date) => {
     return new Date(date).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -110,6 +106,64 @@ export default function Dashboard() {
       hour: '2-digit',
       minute: '2-digit',
     });
+  };
+
+  const formatEventDate = (date) => {
+    if (!date) return '—';
+    return new Date(date).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+  };
+
+  const handlePrintMeasurement = (m) => {
+    const win = window.open('', '_blank');
+    win.document.write(`<!DOCTYPE html><html><head><title>${m.customer_name} — Measurements</title>
+    <style>
+      body{font-family:Arial,sans-serif;padding:24px;max-width:640px;color:#1a1a1a}
+      h1{font-size:22px;margin:0 0 4px 0}
+      .meta{font-size:13px;color:#555;margin-bottom:18px;line-height:1.7}
+      .section{margin-bottom:16px;border-top:1px solid #ddd;padding-top:12px}
+      .section h2{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:#999;margin:0 0 10px 0}
+      .grid{display:grid;grid-template-columns:1fr 1fr;gap:6px 24px}
+      .row{font-size:13px;padding:2px 0}
+      .notes{font-size:13px;line-height:1.5}
+      .footer{font-size:11px;color:#aaa;margin-top:20px;border-top:1px solid #eee;padding-top:8px}
+      @page{margin:0.75in}
+    </style></head><body>
+    <h1>${m.customer_name}</h1>
+    <div class="meta">
+      ${m.wedding_name ? `<strong>Wedding/Event:</strong> ${m.wedding_name}<br>` : ''}
+      ${m.event_date ? `<strong>Event Date:</strong> ${new Date(m.event_date).toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'})}<br>` : ''}
+      ${m.order_type ? `<strong>Order Type:</strong> ${m.order_type}<br>` : ''}
+      ${m.customer_email ? `<strong>Email:</strong> ${m.customer_email}<br>` : ''}
+      ${m.customer_phone ? `<strong>Phone:</strong> ${m.customer_phone}<br>` : ''}
+    </div>
+    <div class="section"><h2>Measurements (inches)</h2><div class="grid">
+      <div class="row"><strong>Chest:</strong> ${m.chest || '—'}"</div>
+      <div class="row"><strong>Overarm:</strong> ${m.overarm || '—'}"</div>
+      <div class="row"><strong>Mid Section:</strong> ${m.mid_section || '—'}"</div>
+      <div class="row"><strong>Waist:</strong> ${m.waist || '—'}"</div>
+      <div class="row"><strong>Outseam:</strong> ${m.outseam || '—'}"</div>
+      <div class="row"><strong>Neck:</strong> ${m.neck || '—'}"</div>
+      <div class="row"><strong>Shirt Sleeve:</strong> ${m.shirt_sleeve || '—'}"</div>
+      <div class="row"><strong>Jacket Sleeve:</strong> ${m.jacket_sleeve || '—'}"</div>
+      <div class="row"><strong>Height:</strong> ${m.height || '—'}</div>
+      <div class="row"><strong>Weight:</strong> ${m.weight ? m.weight+' lbs' : '—'}</div>
+      <div class="row"><strong>Shoe Size:</strong> ${m.shoe_size || '—'}</div>
+      <div class="row"><strong>Shoe Width:</strong> ${m.shoe_width || '—'}</div>
+      <div class="row"><strong>Preferred Fit:</strong> ${m.preferred_fit || '—'}</div>
+    </div></div>
+    ${(m.pickup_date || m.return_date) ? `<div class="section"><h2>Rental Dates</h2><div class="grid">
+      <div class="row"><strong>Pickup:</strong> ${m.pickup_date || '—'}</div>
+      <div class="row"><strong>Return:</strong> ${m.return_date || '—'}</div>
+    </div></div>` : ''}
+    ${m.special_requests ? `<div class="section"><h2>Special Requests / Notes</h2><div class="notes">${m.special_requests}</div></div>` : ''}
+    <div class="footer">Submitted: ${new Date(m.submitted_at).toLocaleString()}</div>
+    <script>window.onload=function(){window.print();}<\/script>
+    </body></html>`);
+    win.document.close();
   };
 
   if (!authenticated) {
@@ -193,7 +247,8 @@ export default function Dashboard() {
                   <th style={styles.tableCell}>Date Submitted</th>
                   <th style={styles.tableCell}>Name</th>
                   <th style={styles.tableCell}>Email</th>
-                  <th style={styles.tableCell}>Wedding</th>
+                  <th style={styles.tableCell}>Wedding/Event</th>
+                  <th style={styles.tableCell}>Event Date</th>
                   <th style={styles.tableCell}>Type</th>
                   <th style={styles.tableCell}>Actions</th>
                 </tr>
@@ -205,6 +260,7 @@ export default function Dashboard() {
                     <td style={styles.tableCell}>{m.customer_name}</td>
                     <td style={styles.tableCell}>{m.customer_email || '—'}</td>
                     <td style={styles.tableCell}>{m.wedding_name || '—'}</td>
+                    <td style={styles.tableCell}>{formatEventDate(m.event_date)}</td>
                     <td style={styles.tableCell}>{m.order_type || '—'}</td>
                     <td style={styles.tableCell}>
                       <button
@@ -252,13 +308,14 @@ export default function Dashboard() {
         <MeasurementModal
           measurement={selectedMeasurement}
           onClose={() => setSelectedMeasurement(null)}
+          onPrint={() => handlePrintMeasurement(selectedMeasurement)}
         />
       )}
     </div>
   );
 }
 
-function MeasurementModal({ measurement, onClose }) {
+function MeasurementModal({ measurement, onClose, onPrint }) {
   return (
     <div style={styles.modal} onClick={onClose}>
       <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
@@ -278,6 +335,12 @@ function MeasurementModal({ measurement, onClose }) {
           </p>
           <p>
             <strong>Wedding/Event:</strong> {measurement.wedding_name || 'Not specified'}
+          </p>
+          <p>
+            <strong>Event Date:</strong>{' '}
+            {measurement.event_date
+              ? new Date(measurement.event_date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+              : 'Not specified'}
           </p>
           <p>
             <strong>Order Type:</strong> {measurement.order_type || 'Not specified'}
@@ -329,7 +392,7 @@ function MeasurementModal({ measurement, onClose }) {
         </div>
 
         <div style={styles.modalActions}>
-          <button onClick={() => window.print()} style={styles.printModalButton}>
+          <button onClick={onPrint} style={styles.printModalButton}>
             🖨️ Print This
           </button>
           <button onClick={onClose} style={styles.closeModalButton}>
