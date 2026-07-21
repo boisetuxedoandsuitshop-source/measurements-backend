@@ -33,7 +33,7 @@ export default async function handler(req, res) {
     } = req.body;
 
     // Validate required fields
-    if (!customer_name || !chest || !overarm || !mid_section || !waist || !outseam || !neck || !shirt_sleeve || !height || !weight || !shoe_size) {
+    if (!customer_name || !customer_phone || !height || !weight) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
