@@ -6,43 +6,42 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  try {
-    const {
-      customer_name,
-      customer_email,
-      customer_phone,
-      wedding_name,
-      order_type,
-      chest,
-      overarm,
-      mid_section,
-      waist,
-      outseam,
-      neck,
-      shirt_sleeve,
-      height,
-      weight,
-      shoe_size,
-      jacket_sleeve,
-      shoe_width,
-      preferred_fit,
-      special_requests,
-      pickup_date,
-      return_date,
-      event_date,
-    } = req.body;
+  const {
+    customer_name,
+    customer_email,
+    customer_phone,
+    wedding_name,
+    order_type,
+    chest,
+    overarm,
+    mid_section,
+    waist,
+    outseam,
+    neck,
+    shirt_sleeve,
+    height,
+    weight,
+    shoe_size,
+    jacket_sleeve,
+    shoe_width,
+    preferred_fit,
+    special_requests,
+    pickup_date,
+    return_date,
+    event_date,
+  } = req.body;
 
-    // Validate required fields
-    if (!customer_name || !customer_phone || !height || !weight) {
-      return res.status(400).json({ error: 'Missing required fields' });
-    }
+  // Validate required fields
+  if (!customer_name || !customer_phone || !height || !weight) {
+    return res.status(400).json({ error: 'Missing required fields' });
+  }
 
-    // Convert empty strings to null for numeric/date columns so Postgres doesn't reject them
-    const num = v => (v === '' || v === null || v === undefined) ? null : v;
-    const dt  = v => (v === '' || v === null || v === undefined) ? null : v;
+  const num = v => (v === '' || v === null || v === undefined) ? null : v;
+  const dt  = v => (v === '' || v === null || v === undefined) ? null : v;
 
-    // Insert into database
-    const result = await query(
+  // Run DB insert and email in parallel, independently
+  const [dbResult, emailResult] = await Promise.allSettled([
+    query(
       `INSERT INTO measurements (
         customer_name, customer_email, customer_phone, wedding_name, order_type,
         chest, overarm, mid_section, waist, outseam, neck, shirt_sleeve, height,
@@ -74,28 +73,29 @@ export default async function handler(req, res) {
         dt(return_date),
         dt(event_date),
       ]
-    );
+    ),
+    sendMeasurementEmail(req.body),
+  ]);
 
-    const measurementId = result.rows[0].id;
+  if (dbResult.status === 'rejected') {
+    console.error('Database error:', dbResult.reason);
+  }
+  if (emailResult.status === 'rejected') {
+    console.error('Email error:', emailResult.reason);
+  }
 
-    // Send email notification
-    try {
-      await sendMeasurementEmail(req.body);
-    } catch (emailError) {
-      console.error('Failed to send email:', emailError);
-      // Don't fail the whole request if email fails
-    }
-
-    return res.status(201).json({
-      success: true,
-      message: 'Measurements submitted successfully',
-      id: measurementId,
-    });
-  } catch (error) {
-    console.error('Submission error:', error);
+  // If DB failed entirely, return 500 — but email was still attempted
+  if (dbResult.status === 'rejected') {
     return res.status(500).json({
-      error: 'Failed to submit measurements',
-      details: error.message,
+      error: 'Failed to save measurements to database',
+      details: dbResult.reason?.message,
+      email_sent: emailResult.status === 'fulfilled',
     });
   }
+
+  return res.status(201).json({
+    success: true,
+    message: 'Measurements submitted successfully',
+    id: dbResult.value.rows[0].id,
+  });
 }
